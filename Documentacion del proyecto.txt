@@ -1,0 +1,880 @@
+Aplicación P2P para compartir contenidos: RING
+Se trata de un proyecto práctico de carácter individual cuyo plazo de entrega se extiende hasta el final del 22 de junio en la convocatoria ordinaria y hasta el final del 14 de julio en la extraordinaria.
+La práctica consiste en desarrollar una aplicación P2P que permita compartir contenidos. Se trata de un sistema P2P estructurado con una topología en anillo. Comparte estas características con el sistema Chord estudiado en la parte teórica de la asignatura, pero la herramienta que se pretende desarrollar es mucho más sencilla y usa un mecanismo de búsqueda lineal (O(n)), en vez de utilizar el esquema de fingers implementado en Chord (O(log n)).
+
+Evidentemente, dadas las limitaciones de este trabajo, el sistema a desarrollar presenta enormes simplificaciones con respecto a las funcionalidades proporcionadas por un sistema real de estas características, pero consideramos que es suficientemente realista para permitir apreciar qué tipo de funcionalidad tienen esta clase de sistemas y entender mejor cuál es su modo de operación interno.
+
+Plataforma de desarrollo
+La práctica se puede desarrollar en cualquier sistema Linux que tenga instalado el entorno de compilación de C. No se requiere ninguna distribución en concreto ni ninguna versión del núcleo específica. A continuación, se plantean distintas alternativas (sea cual sea la plataforma seleccionada, en cualquier caso, como se explicará más adelante, hay que entregar la práctica en triqui.fi.upm.es):
+Cualquiera del conjunto de 4 máquinas asociadas al nombre triqui.fi.upm.es. gestionadas por el centro de cálculo de la escuela (triqui1.fi.upm.es., triqui2.fi.upm.es., triqui3.fi.upm.es. y triqui4.fi.upm.es.).
+Escritorio virtual Linux de la UPM.
+Máquina personal con Linux.
+Instalación de Linux sobre un entorno de virtualización, como, por ejemplo, VirtualBox, en una máquina personal.
+En cuanto a la plataforma para las pruebas de la práctica, se pueden hacer en un único equipo ya que cada nodo de la red P2P va a usar un puerto diferente. En cualquier caso, siempre es más realista realizar las pruebas en un entorno con varios equipos. Esa posibilidad está directamente disponible si se trabaja en triqui. En el caso de usar un entorno de virtualización propio, pueden activarse varias máquinas virtuales conectadas entre sí, como, por ejemplo, con una red NAT en VirtualBox. Una alternativa ligera y flexible, válida para cualquiera de las plataformas planteadas, es el uso de contenedores Docker para representar los distintos equipos, como se explicará más adelante.
+Modo de operación de la aplicación
+Antes de pasar a describir los detalles de la práctica, vamos a explicar cómo se usaría esta aplicación una vez completada para tener en mente desde el principio la funcionalidad que se pretende conseguir:
+Un primer usuario arrancaría la aplicación (ring) especificando el directorio que contiene los ficheros que quiere compartir con el resto de los usuarios de la red P2P. En este punto, se crea el anillo solo con ese nodo.
+Un usuario que quiere conectarse a una red existente debería arrancar la aplicación especificando, además del directorio con sus ficheros exportados, el nombre o dirección IP y el puerto de un nodo que ya forme parte de un anillo P2P (el nodo de contacto). Nótese que el nuevo nodo se ubicaría en el anillo como sucesor del nodo especificado.
+Estando en el anillo, el usuario de una aplicación puede solicitar la descarga de un fichero. Esta petición provocará una búsqueda en el anillo de dicho fichero y, en caso de ser encontrado, su descarga desde el nodo que lo contiene hasta el del usuario solicitante.
+Ejecución de la aplicación
+Aunque todavía no hemos detallado la funcionalidad, se considera conveniente mostrar un ejemplo de ejecución de la aplicación para entender mejor su modo de operación. Se plantea una ejecución con la siguiente traza:
+Un primer usuario activa la ejecución de la aplicación, creándose la red P2P con ese primer nodo.
+Un segundo usuario arranca la ejecución de la aplicación especificando como nodo de contacto el primero, quedando este segundo nodo como sucesor del primero.
+Un tercer usuario inicia la ejecución de la aplicación especificando como nodo de contacto el primero, quedando este tercer nodo como sucesor del primero y siendo su sucesor el segundo nodo.
+Un cuarto usuario ejecuta la aplicación indicando como nodo de contacto el segundo, quedando la siguiente configuración del anillo: nodo 1, nodo 3, nodo 2 y nodo 4.
+En el primer nodo el usuario solicita mediante el menú de texto de la aplicación la descarga de un fichero indicando un máximo de 4 saltos, que corresponde al número máximo de nodos visitados. La petición recorre el anillo detectándose que el fichero está en el nodo 4, realizándose, a continuación, la descarga desde el cuarto nodo al primero.
+Vamos a mostrar este ejemplo de ejecución en distintas plataformas.
+Ejecución de la aplicación en triqui
+Vamos a crear una red P2P con 4 nodos, siguiendo el ejemplo planteando, ejecutando en máquinas diferentes.
+En el primer triqui ejecutamos la aplicación creándose una red P2P con solo ese nodo. Antes hay que descargar el material de apoyo, que está disponible en el Moodle de la asignatura y en una URL con acceso directo, desempaquetarlo, programar la aplicación y compilarla.
+
+# descarga el material de apoyo
+ssoo@triqui1:~$ wget http://laurel.datsi.fi.upm.es/_media/docencia/asignaturas/sd/ring-2026.tgz
+# lo descomprime
+ssoo@triqui1:~$ tar xvfz ring-2026.tgz
+ssoo@triqui1:~$ cd DATSI/SSDD/ring.2026/src/
+# programamos la aplicación y la compilamos
+ssoo@triqui1:src$ make
+cc -Wall -g -Iinclude   -c -o main.o main.c
+cc -Wall -g -Iinclude   -c -o ring_cln.o ring_cln.c
+cc -Wall -g -Iinclude   -c -o ring_srv.o ring_srv.c
+cc -Wall -g -Iinclude   -c -o common.o common.c
+cc -o ring main.o ring_cln.o ring_srv.o common.o -lpthread
+ssoo@triqui1:src$ mkdir dir1 # directorio compartido
+ssoo@triqui1:src$ ./ring dir1 # solo un argumento: se crea la red
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 43583 (PID 3115000) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en el segundo triqui usando el primer nodo como contacto para incorporarse a la red, quedando este nuevo nodo como sucesor.
+ssoo@triqui2:src$ mkdir dir2 # directorio compartido
+ssoo@triqui2:src$ ./ring dir2 triqui1.fi.upm.es 43583 # se incorpora a la red
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui2.fi.upm.es con IP 138.100.240.43 y puerto 40095 (PID 1488066) se incorpora a la red a través del equipo 138.100.240.42 puerto 43583
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en el tercer triqui usando nuevamente el primer nodo como contacto para incorporarse a la red, quedando este nuevo nodo como sucesor del primero y predecesor del segundo.
+ssoo@triqui3:src$ mkdir dir3
+ssoo@triqui3:src$ ./ring dir3 triqui1.fi.upm.es 43583
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui3.fi.upm.es con IP 138.100.240.41 y puerto 36237 (PID 2359351) se incorpora a la red a través del equipo 138.100.240.42 puerto 43583
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en el cuarto triqui, donde hemos creado un fichero para compartir, usando el segundo nodo como contacto para incorporarse a la red, quedando la siguiente configuración del anillo: nodo 1, nodo 3, nodo 2 y nodo 4.
+ssoo@triqui4:src$ mkdir dir4
+ssoo@triqui4:src$ echo hola > dir4/f.txt # fichero a compartir
+ssoo@triqui4:src$ ./ring dir4 triqui2.fi.upm.es 40095
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui4.fi.upm.es con IP 138.100.240.47 y puerto 35165 (PID 2311490) se incorpora a la red a través del equipo 138.100.240.43 puerto 40095
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Volvemos al primer nodo donde solicitamos la búsqueda y descarga de un fichero (operación G).
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+G 
+Introduzca el nombre del fichero: f.txt
+Introduzca el número máximo de nodos visitados: 4
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+
+ssoo@triqui1:src$ cat dir1/f.txt # el fichero ha sido descargado
+hola
+Ejecución de la aplicación en un solo equipo
+Vamos a crear una red P2P con 4 nodos, siguiendo el ejemplo planteando, ejecutando en la misma máquina (mv1 con dirección IP 127.0.1.1).
+En una primera ventana ejecutamos la aplicación creándose una red P2P con solo ese nodo. Antes hay que descargar el material de apoyo, que está disponible en el Moodle de la asignatura y en una URL con acceso directo, desempaquetarlo, programar la aplicación y compilarla.
+
+# descarga el material de apoyo
+$ wget https://laurel.datsi.fi.upm.es/_media/docencia/asignaturas/sd/ring-2026.tgz
+# lo descomprime
+$ tar xvfz ring-2026.tgz
+$ cd DATSI/SSDD/ring.2026/src/
+# programamos la aplicación y la compilamos
+$ make
+cc -Wall -g -Iinclude   -c -o main.o main.c
+cc -Wall -g -Iinclude   -c -o ring_cln.o ring_cln.c
+cc -Wall -g -Iinclude   -c -o ring_srv.o ring_srv.c
+cc -Wall -g -Iinclude   -c -o common.o common.c
+cc -o ring main.o ring_cln.o ring_srv.o common.o -lpthread
+$ mkdir dir1
+$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo mv1 con IP 127.0.1.1 y puerto 44017 (PID 19994) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en una segunda ventana usando el primer nodo como contacto para incorporarse a la red, quedando este nuevo nodo como sucesor.
+$ mkdir dir2
+$ ./ring dir2 127.0.1.1  44017
+Bienvenido a la red P2P RING
+----------------------------
+El equipo mv1 con IP 127.0.1.1 y puerto 34093 (PID 20020) se incorpora a la red a través del equipo 127.0.1.1 puerto 44017
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en una tercera ventana usando nuevamente el primer nodo como contacto para incorporarse a la red, quedando este nuevo nodo como sucesor del primero y predecesor del segundo.
+i$ mkdir dir3
+$ ./ring dir3 127.0.1.1  44017
+Bienvenido a la red P2P RING
+----------------------------
+El equipo mv1 con IP 127.0.1.1 y puerto 33007 (PID 20056) se incorpora a la red a través del equipo 127.0.1.1 puerto 44017
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en una cuarta ventana, creando antes un fichero en el directorio compartido, usando el segundo nodo como contacto para incorporarse a la red, quedando la siguiente configuración del anillo: nodo 1, nodo 3, nodo 2 y nodo 4.
+$ mkdir  dir4
+$ echo hola > dir4/f.txt
+$ ./ring dir4 127.0.1.1 34093
+Bienvenido a la red P2P RING
+----------------------------
+El equipo mv1 con IP 127.0.1.1 y puerto 44535 (PID 20088) se incorpora a la red a través del equipo 127.0.1.1 puerto 34093
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Volvemos a la primera ventana donde solicitamos la búsqueda y descarga de un fichero (operación G).
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+G 
+Introduzca el nombre del fichero: f.txt
+Introduzca el número máximo de nodos visitados: 4
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+
+$ cat dir1/f.txt
+hola
+Ejecución de la aplicación usando Docker
+El primer paso es, evidentemente, instalar Docker.
+A continuación, vamos a crear una red P2P con 4 nodos, siguiendo el ejemplo planteando, ejecutando cada uno en un contenedor Docker basado en una imagen compatible con la distribución instalada en el equipo. Así, por ejemplo, para esta distribución:
+
+$ lsb_release -d # distribución instalada en el equipo
+No LSB modules are available.
+Description:	Ubuntu 24.04.3 LTS
+Usaríamos la imagen ubuntu:24.04.
+Antes hay que descargar el material de apoyo, que está disponible en el Moodle de la asignatura y en una URL con acceso directo, desempaquetarlo, programar la aplicación y compilarla.
+
+# descarga el material de apoyo
+$ wget https://laurel.datsi.fi.upm.es/_media/docencia/asignaturas/sd/ring-2026.tgz
+# lo descomprime
+$ tar xvfz ring-2026.tgz
+$ cd DATSI/SSDD/ring.2026/src/
+# programamos la aplicación y la compilamos
+$ make
+cc -Wall -g -Iinclude   -c -o main.o main.c
+cc -Wall -g -Iinclude   -c -o ring_cln.o ring_cln.c
+cc -Wall -g -Iinclude   -c -o ring_srv.o ring_srv.c
+cc -Wall -g -Iinclude   -c -o common.o common.c
+cc -o ring main.o ring_cln.o ring_srv.o common.o -lpthread
+En el primer contenedor ejecutamos la aplicación creándose una red P2P con solo ese nodo (nótese que se especifica mediante la opción -v que el directorio /RING del contenedor corresponderá al directorio src de la práctica):
+# estando en el directorio src
+$ docker run --rm -it  -v $PWD:/RING ubuntu:24.04
+root@8ad8c6e384a4:/# cd RING/
+root@8ad8c6e384a4:/RING# mkdir /tmp/dir
+root@8ad8c6e384a4:/RING# ./ring /tmp/dir
+Bienvenido a la red P2P RING
+----------------------------
+El equipo 8ad8c6e384a4 con IP 172.17.0.2 y puerto 35817 (PID 10) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+
+Ejecutamos la aplicación en un segundo contenedor usando el primer nodo como contacto para incorporarse a la red, quedando este nuevo nodo como sucesor.
+$ docker run --rm -it  -v $PWD:/RING ubuntu:24.04
+root@bb2766f8f385:/# cd RING/
+root@bb2766f8f385:/RING# mkdir /tmp/dir
+root@bb2766f8f385:/RING# ./ring /tmp/dir 172.17.0.2 35817 
+Bienvenido a la red P2P RING
+----------------------------
+El equipo bb2766f8f385 con IP 172.17.0.3 y puerto 44455 (PID 10) se incorpora a la red a través del equipo 172.17.0.2 puerto 35817
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en un tercer contenedor usando nuevamente el primer nodo como contacto para incorporarse a la red, quedando este nuevo nodo como sucesor del primero y predecesor del segundo.
+$ docker run --rm -it  -v $PWD:/RING ubuntu:24.04
+root@8fb0ecdf5326:/# cd RING
+root@8fb0ecdf5326:/RING# mkdir /tmp/dir
+root@8fb0ecdf5326:/RING# ./ring /tmp/dir 172.17.0.2 35817
+Bienvenido a la red P2P RING
+----------------------------
+El equipo 8fb0ecdf5326 con IP 172.17.0.4 y puerto 34265 (PID 10) se incorpora a la red a través del equipo 172.17.0.2 puerto 35817
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Ejecutamos la aplicación en un cuarto contenedor, donde hemos creado un fichero para compartir, usando el segundo nodo como contacto para incorporarse a la red, quedando la siguiente configuración del anillo: nodo 1, nodo 3, nodo 2 y nodo 4.
+$ docker run --rm -it  -v $PWD:/RING ubuntu:24.04
+root@8f7e74c31364:/#
+exit
+$
+$ docker run --rm -it  -v $PWD:/RING ubuntu:24.04
+root@cae3439e0d2a:/# cd RING/
+root@cae3439e0d2a:/RING# mkdir /tmp/dir
+root@cae3439e0d2a:/RING# echo hola > /tmp/dir/f.txt
+root@cae3439e0d2a:/RING# ./ring /tmp/dir 172.17.0.3  44455
+Bienvenido a la red P2P RING
+----------------------------
+El equipo cae3439e0d2a con IP 172.17.0.5 y puerto 35293 (PID 10) se incorpora a la red a través del equipo 172.17.0.3 puerto 44455
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Volvemos al primer nodo donde solicitamos la búsqueda y descarga de un fichero (operación G).
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+G 
+Introduzca el nombre del fichero: f.txt
+Introduzca el número máximo de nodos visitados: 4
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+
+root@8ad8c6e384a4:/RING# cat /tmp/dir/f.txt
+hola
+Características y requisitos de la aplicación
+A continuación, se describen las características de la aplicación que se debe desarrollar especificando, resaltados en negrilla, una serie de requisitos que deben ser obligatoriamente satisfechos:
+Al tratarse de un esquema P2P, hay un solo rol, de manera que cada nodo de la red P2P ejecuta la misma aplicación (ring).
+Un nodo de la red tiene una doble funcionalidad comportándose en parte como cliente, atendiendo a los usuarios y encaminando sus peticiones a los nodos involucrados, y en parte como servidor, procesando las peticiones recibidas que han sido enviadas por otros nodos.
+Ambas partes tienen que estar activas simultáneamente por lo que en la fase inicial de un nodo se creará un thread que ejecutará la funcionalidad de la parte servidora.
+La práctica debe funcionar tanto en local como en remoto.
+En cuanto a las tecnologías de comunicación usadas en la práctica, se programará en C, se utilizarán sockets de tipo stream (TCP) y se supondrá un entorno de máquinas heterogéneas.
+No se mantendrán conexiones persistentes entre los nodos, usándose una conexión por petición.
+La parte servidora proporcionará un servicio concurrente basado en la creación dinámica de threads encargándose cada thread de servir la única petición que llega por una conexión.
+Recuerde que debe manejar adecuadamente las cadenas de caracteres recibidas, como son los nombres de los ficheros, asegurándose de que terminan en un carácter nulo.
+El diseño del sistema no debe establecer ninguna limitación en la longitud que puede tener el nombre de un fichero ni en el tamaño de su contenido. De hecho, aunque en este enunciado para las pruebas se usen ficheros pequeños con nombres cortos, el corrector usa ficheros grandes con nombres largos.
+Para transferir los nombres de fichero y su contenido, dado su tamaño variable, se enviará previamente su longitud.
+Como se explicará más adelante, se debe garantizar un comportamiento zerocopy en los siguientes aspectos:
+No deben realizarse copias en memoria de los nombres de fichero ni del contenido de los mismos, dado que son objetos que pueden tener gran tamaño.
+En caso de que haya que enviar varios elementos, para evitar la fragmentación de los paquetes de red, se puede optar por utilizar un único writev o usar la opción MSG_MORE del send.
+En el envío del fichero debe usarse sendfile.
+En la recepción del fichero debe usarse mmap.
+El usuario de la aplicación puede especificar los equipos usando su nombre o su dirección IP, pero, internamente, se usan direcciones IP (como veremos, el módulo main.c se encarga de la transformación). Asimismo, se debe tener en cuenta que ese mismo módulo se encarga de que las direcciones IP y los puertos tengan internamente formato de red, no siendo necesario, por tanto, su transformación en ningún momento (excepto si se quieren imprimir).
+Organización del código de la práctica
+Revisemos los distintos directorios:
+ejemplos: No es un directorio de desarrollo. Contiene ejemplos que pueden servir de base para el desarrollo de la práctica. A lo largo del enunciado se hará referencia a ellos.
+src: Directorio con el código fuente de la práctica. Recuerde que solo existe un ejecutable (ring).
+main.c: Se encarga de la interfaz de usuario, transformando las direcciones IP y los puertos a formato de red. Este fichero no forma parte de la entrega.
+ring_cln.c: Parte cliente de la aplicación. Este fichero sí forma parte de la entrega.
+ring_srv.c: Parte servidora de la aplicación. Este fichero sí forma parte de la entrega.
+common.c: Para funcionalidad común de ambas partes. Este fichero sí forma parte de la entrega.
+include/common.h: Interfaz para funcionalidad común de ambas partes. Este fichero sí forma parte de la entrega.
+include/ring.h: Interfaz ofrecida a la aplicación. Este fichero no forma parte de la entrega.
+API ofrecida a las aplicaciones
+En esta sección, se describen las operaciones que proporciona la parte cliente (declaradas en include/ring_cln.h y definidas en ring_cln.c) que son usadas por las aplicaciones (en este caso, main.c, pero podrían ser otras como, por ejemplo, una aplicación gráfica). A continuación, se describen las operaciones del API, cuya funcionalidad más detallada será explicada de forma incremental, según se vayan especificando los sucesivos pasos en el desarrollo de la práctica. Nótese que todas las funciones están diseñadas para manejar direcciones IP y puertos en formato de red, y así lo hace el fichero main.c que es el que las usa. Téngase en cuenta que toda la funcionalidad de la aplicación está accesible a través de la última función (ring_get_file). El resto de las funciones, excepto la de inicialización (ring_init), sirven o bien para verificar la funcionalidad de cada paso en el desarrollo o para realizar este de forma incremental.
+// inicia el nodo añadiéndolo a la red P2P si ya está creada;
+// los puertos e IPs deben estar en formato de red;
+// debe devolver en el último parámetro el puerto reservado en formato red;
+// retorna 0 si OK y -1 si error
+int ring_init(const char *shared_dir, unsigned int local_ip, unsigned int remote_ip, unsigned short remote_port, unsigned short *alloc_port);
+
+// función local que devuelve la IP y el puerto del nodo
+int ring_self(unsigned int *ip, unsigned short *port);
+
+// devuelve el PID del nodo remoto especificado o -1 si error
+int ring_remote_pid(unsigned int remote_ip, unsigned short remote_port);
+
+// función local que devuelve la IP y el puerto del nodo sucesor
+int ring_successor(unsigned int *ip, unsigned short *port);
+
+// devuelve la IP y el puerto del nodo sucesor del especificado;
+// retorna 0 si OK y -1 si error
+int ring_remote_successor(unsigned int remote_ip, unsigned short remote_port, unsigned int *suc_ip, unsigned short *suc_port);
+
+// devuelve la IP y el puerto del nodo sucesor del sucesor del especificado;
+// retorna 0 si OK y -1 si error
+int ring_remote_successor_successor(unsigned int remote_ip, unsigned short remote_port, unsigned int *suc_suc_ip, unsigned short *suc_suc_port);
+
+// descarga el fichero del nodo especificado;
+// retorna el tamaño del fichero si OK y -1 en caso de error
+int ring_download(unsigned int remote_ip, unsigned short remote_port, const char *filename);
+
+// busca el fichero en el anillo dando un número máximo de saltos y devolviendo
+// la IP y el puerto del nodo que lo contiene;
+// retorna 0 si OK y -1 si error
+int ring_lookup(const char *filename, int hops, unsigned int *ip, unsigned short *port);
+
+// busca y descarga el fichero del nodo encontrado en el anillo que lo contiene;
+// retorna el tamaño del fichero si OK y -1 en caso de error
+int ring_get_file(const char *filename, int hops);
+Fases en el desarrollo de la práctica
+Se plantean 5 fases incrementales:
+(2,5 puntos) Despliegue de la parte servidora e implementación de la primera operación remota.
+(2,5 puntos) Gestión de altas con mantenimiento del anillo e implementación de la primera operación que usa el anillo.
+(2,5 puntos) Descarga directa de un fichero.
+(2,5 puntos) Búsqueda de un fichero.
+(0 puntos) Búsqueda y descarga de un fichero. Ya está programada puesto que se basa en el uso combinado de las dos fases previas.
+Fase 1: Despliegue de la parte servidora e implementación de la primera operación remota (2,5 puntos)
+En esta fase se va a incluir la funcionalidad de la parte servidora y se va a implementar una primera operación de ese servicio, distinguiéndose dos pasos:
+Despliegue de la parte servidora (1,5 puntos).
+Implementación de la primera operación remota (1 punto).
+Paso 1: Despliegue de la parte servidora (1,5 puntos)
+En este paso, se debe crear el socket de servicio y activar un thread que se encargue de tratar las peticiones que llegan por ese socket. Como se explicó previamente, la funcionalidad de servidor debe incluirse en un thread ya que, al tratarse de una arquitectura P2P, debe convivir con la funcionalidad de cliente.
+Se trata de una funcionalidad de servidor, que, conforme a los requisitos planteados, debe usar un esquema de threads dinámicos con una petición/thread por conexión. Nótese que se usan dos tipos de threads: un único thread para implementar la funcionalidad de servidor y, dentro de este, un thread por conexión para ofrecer un servicio concurrente.
+
+Para implementar esta parte, se recomienda tomar como base el ejemplo server.c, que implementa un servidor de las características requeridas, pero adaptándolo a su ejecución en el contexto de un thread.
+
+Enumeremos qué acciones hay que llevar a cabo en este paso. Con respecto a la parte cliente (ring_cln.c), debe incorporarse en la función inicial (ring_init) la siguiente funcionalidad:
+
+Debe guardar la información recibida en sus parámetros e implementarse la función ring_self a partir de ella.
+Debe crear el socket de servicio, para lo que puede usar la función create_socket_srv, tal como se hace en el ejemplo propuesto. Esa función devuelve el puerto seleccionado por el sistema operativo en formato de red, que, a su vez, debe ser devuelto por esta función.
+Debe crear el thread de servicio que ejecutará la función server_thread de ring_srv.c pasándole como argumento el socket de servicio. Para ello, puede usar la función create_thread de common.c, que crea un thread de tipo detached.
+En cuanto a la parte servidora (ring_srv.c), debe incorporarse la funcionalidad de un servidor, adaptando el ejemplo propuesto.
+Prueba
+Se van a realizar todas las pruebas en triqui. Debe adaptarlas a las características de su plataforma de pruebas, tal como se explicó al principio del documento.
+A continuación, se describe la prueba de este paso.
+
+ssoo@triqui1:src$ mkdir dir1 # crea un directorio para compartir ficheros
+ssoo@triqui1:src$ ./ring dir1 # arranca la aplicación y ejecuta la operación I
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 38503 (PID 2542419) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+I
+
+IP 138.100.240.42 port 38503
+El resultado de esa operación (IP 138.100.240.42 port 38503), que corresponde a la operación ring_self, es correcto ya que coincide con los datos mostrados en el mensaje de bienvenida.
+Podemos verificar en otra ventana que ese proceso (PID=2542419) está escuchando por ese puerto:
+
+ssoo@triqui1:src$ ss -tap | grep 38503
+LISTEN    0      5                      0.0.0.0:38503                         0.0.0.0:*     users:(("ring",pid=2542419,fd=3))
+Paso 2: Implementación de la primera operación remota (1 punto)
+El objetivo de esta operación es simplemente validar la funcionalidad actual de la aplicación, incorporando la lógica cliente-servidor. Dado que en este paso aparece la primera operación remota que requiere que la parte cliente de un nodo se comunique con la parte servidora de otro nodo (nótese que se trata de una operación directa, no usándose todavía el anillo), es necesario realizar algunas consideraciones sobre el diseño del esquema de comunicaciones:
+Hay que identificar las distintas operaciones, asignando a cada una algún tipo de código de operación. A continuación, se plantean algunas opciones:
+Se puede usar un carácter (por ejemplo, 'P' para la operación de obtener el PID de un nodo remoto).
+Se puede utilizar un entero (por ejemplo, un 0 para dicha operación).
+Se puede usar una cadena de caracteres (por ejemplo, "GETPID" para la operación), de manera similar a HTTP.
+Cada función de la parte cliente que requiera una operación remota debe conectarse con el nodo correspondiente y enviar ese código de operación junto con los parámetros de dicha operación, en caso de que los tenga. A continuación, tiene que quedarse esperando por la respuesta.
+La parte servidora, que hemos adaptado de server.c, en el thread que se crea para servir la petición, debe recibir el código de operación y, dependiendo de qué operación se trate, los parámetros correspondientes a dicha operación, realizar la acción pertinente y enviar el resultado de la misma.
+Con respecto a cómo organizar el código de servicio, se presentan distintas alternativas:
+Usar un switch, con un case por cada operación (no aplicable si el código de operación es una cadena de caracteres).
+Utilizar una secuencia if else if.
+En caso de usar como códigos de operación enteros consecutivos, se puede usar un vector de punteros a función, con una posición por cada operación, e indexarlo directamente con el código de operación.
+Con respecto al requisito del comportamiento zerocopy planteado previamente:
+En caso de necesitarse realizar varios envíos, para evitar la fragmentación de los paquetes de red, se debe optar entre utilizar:
+un único writev, que permite enviar varios objetos con una sola operación, tal como se aprecia en el ejemplo client_writev.c.
+usar la opción MSG_MORE del send, que permite informar al sistema operativo que se van a enviar más mensajes por ese socket, lo que permite evitar la fragmentación, tal como se ilustra en el ejemplo client_sendmore.c.
+Recuerde que no deben realizarse copias en memoria de los nombres de fichero ni del contenido de los mismos, dado que son objetos que pueden tener gran tamaño. Tenga en cuenta que este requisito es el que provoca que sean necesarios varios envíos, tal como se plantea en el punto anterior. Eso ocurre, por ejemplo, en la operación de lookup, que requiere enviar varios enteros y el nombre del fichero. Asimismo, tenga en cuenta que, dado su tamaño variable, a la hora de enviar el nombre de un fichero o su contenido, hay que mandar previamente su tamaño.
+Pasemos a describir la funcionalidad que se plantea en este paso, que requiere implementar la operación remota que obtiene el PID de un nodo:
+En la parte cliente (ring_remote_pid), debe conectarse a la parte servidora del nodo especificado, enviar solo el código de operación, al no haber parámetros, recibir la respuesta, cerrar el socket y retornar el valor obtenido o un -1 si hay un error. Puede basarse en los ejemplos de clientes proporcionados. A la hora de realizar la conexión, se recomienda usar la función de apoyo create_socket_cln, pero teniendo en cuenta que es diferente a la usada en los ejemplos, puesto que este caso ya se conocen la IP y el puerto en formato de red.
+En la parte servidora, debe recibir el código de operación, discriminar el tipo de operación, procesarla, enviar la respuesta, cerrar el socket y terminar el thread.
+Prueba
+A continuación, se muestra una prueba para comprobar la funcionalidad de este paso. Nótese que podemos probar a preguntar por el PID del propio nodo.
+ssoo@triqui1:src$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 44877 (PID 2576024) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+	I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+P
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 44877
+
+PID 2576024
+Fase 2: Gestión de altas con mantenimiento del anillo e implementación de la primera operación que usa el anillo (2,5 puntos)
+En esta fase se va a incluir la funcionalidad de mantenimiento del anillo, que permite incorporar nodos a la red, distinguiéndose tres pasos:
+Alta de un nodo (0,75 puntos).
+Operación que obtiene el sucesor de un nodo remoto (0,5 puntos).
+Implementación de la primera operación que usa el anillo (1,25 puntos).
+Paso 1: Alta de un nodo (0,75 puntos)
+Como en la mayoría de los sistemas P2P, se produce el problema del bootstrap, es decir, la manera como se incorpora un nodo a una red existente. En esta aplicación se ha optado por la solución habitual: obtener por un procedimiento ajeno a la aplicación el nombre o la dirección IP y el puerto de cualquier proceso que ya está en el anillo. A la hora de ubicarse, el nuevo nodo se colocará como sucesor del nodo que ha servido de contacto y tendrá como sucesor el actual de dicho nodo de contacto. Nótese que una red de un solo nodo es también un anillo y, por tanto, el sucesor de ese nodo es el mismo.
+A continuación, se explica la funcionalidad que hay que incorporar en este paso:
+
+Debe gestionarse la información de qué nodo es el sucesor e implementarse la función ring_successor a partir de ella.
+Hay que definir una nueva operación que permita dar de alta un nuevo nodo en una red ya existente.
+Esa operación de alta debe enviar al nodo de contacto la información del nuevo nodo, que pasará a ser el nuevo sucesor de dicho nodo de contacto, y responder al nuevo nodo con la información del sucesor actual del nodo de contacto, que pasará a ser el sucesor del nuevo nodo. Nótese que es suficiente con que el nuevo nodo envíe su puerto de servicio, no necesitando mandar su dirección IP, ya que esta le llega al nodo de contacto como parte del protocolo TCP (la propia función accept o, posteriormente, getpeername devuelven la dirección IP del nodo que se conecta).
+En la función inicial (ring_init) de la parte cliente (ring_cln.c), en caso de querer incorporarse a una red ya existente, debe solicitarse esa nueva operación, conectándose al nodo de contacto, enviándole el código de operación y el puerto de servicio, quedándose a la espera de la respuesta que permitirá actualizar el sucesor de ese nuevo nodo, y, finalmente, cerrando el socket.
+En la parte servidora (ring_srv.c), hay que ajustar su sucesor con los valores correspondientes al nuevo nodo y responder con los que tenía previamente como sucesor.
+Prueba
+A continuación, se muestra una prueba para comprobar la funcionalidad de este paso, planteando un escenario similar al mostrado en la parte inicial del documento.
+En el primer equipo, se crea la red y se verifica mediante la operación sucesor que se trata de un anillo ya que el nodo se apunta a sí mismo:
+
+ssoo@triqui1:src$ mkdir dir1
+ssoo@triqui1:src$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 33877 (PID 3353312) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.42 port 33877
+En el segundo equipo, se añade un nodo a la red y se verifica que su sucesor es el primer nodo:
+
+ssoo@triqui2:src$ mkdir dir2
+ssoo@triqui2:src$ ./ring dir2 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui2.fi.upm.es con IP 138.100.240.43 y puerto 37345 (PID 1599259) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.42 port 33877
+Volvemos al primer equipo a verificar que su sucesor apunta al segundo nodo:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.43 port 37345
+Añadimos un tercer nodo usando el primero como nodo de contacto. Verificamos que el orden en el anillo es: nodo 1, nodo 3 y nodo 2.
+ssoo@triqui3:src$ mkdir dir3
+ssoo@triqui3:src$ ./ring dir3 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui3.fi.upm.es con IP 138.100.240.41 y puerto 42777 (PID 2540925) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+        
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.43 port 37345
+Volvemos al primer nodo para verificarlo:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.41 port 42777
+Retornamos también al segundo nodo para verificarlo:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.42 port 33877
+Por último, añadimos un cuarto nodo usando el segundo nodo creado como nodo de contacto. Comprobamos que el orden resultante en el anillo es: nodo 1, nodo 3, nodo 2 y nodo 4.
+ssoo@triqui4:src$ mkdir dir4
+ssoo@triqui4:src$ echo hola > dir4/f.txt
+ssoo@triqui4:src$ ./ring dir4 triqui2.fi.upm.es 37345
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui4.fi.upm.es con IP 138.100.240.47 y puerto 41785 (PID 2491371) se incorpora a la red a través del equipo 138.100.240.43 puerto 37345
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.42 port 33877
+Volvemos al primer nodo, que sigue apuntando al tercero creado:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.41 port 42777
+El segundo ha pasado a referenciar al nuevo:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+S
+
+IP 138.100.240.47 port 41785
+Y el tercero creado sigue apuntando al segundo:
+S
+
+IP 138.100.240.43 port 37345
+Paso 2: Operación sucesor de un nodo remoto (0,5 puntos)
+El objetivo de esta segunda operación remota es incorporar una operación que devuelva la dirección IP y puerto de un nodo, de manera que, más adelante, nos sirva de base para la operación lookup, que devuelve esa misma información.
+Similar a la primera operación remota, que obtenía el PID del proceso remoto especificado, pero, en este caso, recibe la información (IP y puerto) del sucesor de dicho nodo, en vez de un entero con el PID. Ese código hay que incorporarlo en la función get_remote_successor y en la parte servidora.
+
+Prueba
+A continuación, se muestra una prueba para comprobar la funcionalidad de este paso, planteando un escenario similar al mostrado en la parte inicial del documento. Después de la incorporación de cada nodo, vamos a comprobar en el primer nodo cuáles son los sucesores remotos del resto.
+En el primer equipo, se crea la red y se verifica mediante la operación sucesor remoto que se trata de un anillo ya que el nodo se apunta a sí mismo:
+
+ssoo@triqui1:src$ mkdir dir1
+ssoo@triqui1:src$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 33877 (PID 3353312) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.42 port 33877
+En el segundo equipo, se añade un nodo a la red:
+
+ssoo@triqui2:src$ mkdir dir2
+ssoo@triqui2:src$ ./ring dir2 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui2.fi.upm.es con IP 138.100.240.43 y puerto 37345 (PID 1599259) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+
+Volvemos al primer equipo a verificar los sucesores remotos de todos los nodos:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.43 port 37345
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui2.fi.upm.es
+Introduzca el puerto del host remoto: 37345
+
+IP 138.100.240.42 port 33877
+
+Añadimos un tercer nodo usando el primero como nodo de contacto.
+ssoo@triqui3:src$ mkdir dir3
+ssoo@triqui3:src$ ./ring dir3 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui3.fi.upm.es con IP 138.100.240.41 y puerto 42777 (PID 2540925) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+        
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Volvemos al primer equipo a verificar los sucesores remotos de todos los nodos:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.41 port 42777
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui2.fi.upm.es
+Introduzca el puerto del host remoto: 37345
+
+IP 138.100.240.42 port 33877
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui3.fi.upm.es
+Introduzca el puerto del host remoto: 42777
+
+IP 138.100.240.43 port 37345
+Por último, añadimos un cuarto nodo usando el segundo nodo creado como nodo de contacto.
+ssoo@triqui4:src$ mkdir dir4
+ssoo@triqui4:src$ echo hola > dir4/f.txt
+ssoo@triqui4:src$ ./ring dir4 triqui2.fi.upm.es 37345
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui4.fi.upm.es con IP 138.100.240.47 y puerto 41785 (PID 2491371) se incorpora a la red a través del equipo 138.100.240.43 puerto 37345
+Volvemos al primer equipo a verificar los sucesores remotos de todos los nodos:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.41 port 42777
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui2.fi.upm.es
+Introduzca el puerto del host remoto: 37345
+
+IP 138.100.240.47 port 41785
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui3.fi.upm.es
+Introduzca el puerto del host remoto: 42777
+
+IP 138.100.240.43 port 37345
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+R
+Introduzca el nombre o la IP del host remoto: triqui4.fi.upm.es
+Introduzca el puerto del host remoto: 41785
+
+IP 138.100.240.42 port 33877
+Paso 3: Implementación de la primera operación que usa el anillo (1,25 puntos)
+Hasta el momento, todas las operaciones planteadas, que están pensadas para poder realizar pruebas, contactaban con el nodo especificado, no haciendo uso del anillo. Esta es la primera que sí lo hace ya que tiene que obtener el sucesor del sucesor del nodo especificado. El objetivo de esta operación es entender el funcionamiento de las operaciones que usan el anillo, de manera que nos sirva más adelante como base de la implementación de la operación de lookup. En este tipo de operaciones, cambia el patrón de la comunicación. Hasta ahora la comunicación se establecía entre la parte cliente de un nodo y la parte servidora de otro, que podría ser el mismo. En esta nueva clase de operaciones, como parte de la propagación de los mensajes por el anillo, aparece también una comunicación entre la parte servidora de un nodo, ejerciendo el rol de cliente, y la parte servidora de otro nodo, haciendo el papel de servidor.
+Concretando, el patrón de comunicación de esta operación es el siguiente:
+
+Un usuario en un determinado nodo N1 solicita la operación que obtiene el sucesor del sucesor de un determinado nodo que especifica (N2), invocando la función ring_remote_successor_successor.
+Como parte del código de esa función, el lado cliente de N1 envía a la parte servidora de N2 el mensaje con esa petición y se queda esperando la respuesta. Nótese que esta parte tiene el mismo comportamiento que las dos operaciones remotas introducidas hasta ahora.
+La parte servidora de N2, al detectar esta operación, debe ejercer el rol de cliente (este es el punto donde cambia el patrón) enviando la operación sucesor (y no sucesor de sucesor), que se implementó en el paso previo, a su nodo sucesor (N3), y quedándose a la espera de la respuesta. Cuando reciba la respuesta, se la enviará a N1, que estaba esperándola.
+La parte servidora de N3 responde a la petición de sucesor.
+A continuación, se describe la funcionalidad que hay que implementar:
+Hay que implementar una nueva operación remota.
+En la función ring_remote_successor_successor de la parte cliente, hay que incorporar la nueva operación. Dado que tiene las mismas características que la operación anterior (no tiene parámetros y devuelve IP y puerto), es igual cambiando solamente el código de operación.
+La parte servidora, sin embargo, cambia respecto a las operaciones anteriores ya que tiene que ejercer de cliente enviando una operación de sucesor al siguiente nodo del anillo, esperando su respuesta y enviando esta al nodo cliente original. Nótese que, dado que la parte servidora está ejerciendo de cliente, es posible usar en esta la función ring_remote_successor del lado cliente para implementar parte de esta funcionalidad.
+Prueba
+A continuación, se muestra una prueba para comprobar la funcionalidad de este paso, planteando un escenario similar al mostrado en la parte inicial del documento. Después de la incorporación de cada nodo, vamos a comprobar en el primer nodo cuáles son los sucesores de los sucesores del resto.
+En el primer equipo, se crea la red y se verifica mediante la operación sucesor de sucesor que se trata de un anillo ya que el nodo se apunta a sí mismo:
+
+ssoo@triqui1:src$ mkdir dir1
+ssoo@triqui1:src$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 33877 (PID 3353312) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.42 port 33877
+En el segundo equipo, se añade un nodo a la red:
+
+ssoo@triqui2:src$ mkdir dir2
+ssoo@triqui2:src$ ./ring dir2 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui2.fi.upm.es con IP 138.100.240.43 y puerto 37345 (PID 1599259) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+
+Volvemos al primer equipo a verificar los sucesores remotos de todos los nodos:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.42 port 33877
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui2.fi.upm.es
+Introduzca el puerto del host remoto: 37345
+
+IP 138.100.240.43 port 37345 
+
+Añadimos un tercer nodo usando el primero como nodo de contacto.
+ssoo@triqui3:src$ mkdir dir3
+ssoo@triqui3:src$ ./ring dir3 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui3.fi.upm.es con IP 138.100.240.41 y puerto 42777 (PID 2540925) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+        
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Volvemos al primer equipo a verificar los sucesores de los sucesores de todos los nodos:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.43 port 37345
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui2.fi.upm.es
+Introduzca el puerto del host remoto: 37345
+
+IP 138.100.240.41 port 42777
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui3.fi.upm.es
+Introduzca el puerto del host remoto: 42777
+
+IP 138.100.240.42 port 33877
+Por último, añadimos un cuarto nodo usando el segundo nodo creado como nodo de contacto.
+ssoo@triqui4:src$ mkdir dir4
+ssoo@triqui4:src$ echo hola > dir4/f.txt
+ssoo@triqui4:src$ ./ring dir4 triqui2.fi.upm.es 37345
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui4.fi.upm.es con IP 138.100.240.47 y puerto 41785 (PID 2491371) se incorpora a la red a través del equipo 138.100.240.43 puerto 37345
+Volvemos al primer equipo a verificar los sucesores de los sucesores de todos los nodos:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui1.fi.upm.es
+Introduzca el puerto del host remoto: 33877
+
+IP 138.100.240.43 port 37345
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui2.fi.upm.es
+Introduzca el puerto del host remoto: 37345
+
+IP 138.100.240.42 port 33877
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui3.fi.upm.es
+Introduzca el puerto del host remoto: 42777
+
+IP 138.100.240.47 port 41785
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+U
+Introduzca el nombre o la IP del host remoto: triqui4.fi.upm.es
+Introduzca el puerto del host remoto: 41785
+
+IP 138.100.240.41 port 42777
+Fase 3: Descarga directa de un fichero (2,5 puntos)
+En este punto vamos a afrontar el objetivo fundamental de la práctica: buscar y descargar ficheros compartidos en el anillo P2P. Para realizar la práctica de forma incremental, vamos a dividir esta funcionalidad final en tres fases:
+Descarga directa del fichero (ring_download), que corresponde a esta fase y no usa el anillo.
+Búsqueda del fichero en el anillo (ring_lookup), que corresponde a la siguiente fase y, evidentemente, sí usa el anillo.
+La funcionalidad final que combina la búsqueda del fichero y su posterior descarga desde el nodo que la contiene (ring_get_file). Se trata de la última fase, que ya está completada al hacer un uso combinado de las dos operaciones anteriores.
+Con objeto de reducir las operaciones de copia de datos entre zonas de memoria, buscando el zerocopy, tal como se planteó al principio del documento, en la transferencia del fichero entre los dos nodos se debe tener en cuenta:
+El uso de sendfile en el envío del fichero. Con esta estrategia, la tarjeta de red envía directamente usando DMA los datos previamente leídos del fichero utilizando también DMA. No hay ninguna copia de memoria durante la operación. Nótese que, si se hubiera usado una lectura del fichero y un envío por el socket de los datos leídos, habría dos operaciones de copia: del buffer del sistema de ficheros donde se han leído los datos a la variable del programa especificada en la lectura y de esa variable al buffer del sistema operativo asociado al socket.
+La utilización de mmap en su recepción. Con esta estrategia, se crea una zona de memoria asociada al fichero con mmap y se reciben los datos directamente sobre esa zona. Nótese que, si se hubiera usado una recepción del socket y una escritura en el fichero de los datos recibidos, habría dos operaciones de copia: del buffer del socket a la variable del programa especificada en la recepción y de esta variable al buffer del sistema de ficheros asociado al fichero. Con el mmap, desaparece la primera copia porque la zona de memoria creada sobre la que se reciben los datos del socket está vinculada directamente con el buffer del sistema de ficheros asociado al fichero. Téngase en cuenta que en este caso el ahorro es menor porque se mantiene una de las dos copias: la del buffer del socket al del sistema de ficheros. Hay que resaltar que el sendfile permite enviar datos de un fichero por un socket pero no viceversa.
+Recuerde que, dado el tamaño variable de los nombres de fichero y su contenido, hay que enviar previamente su tamaño.
+Recuerde también el uso de writev y/o la opción MSG_MORE de send para reducir la fragmentación de los paquetes de red.
+A continuación, se explica qué funcionalidad hay que incluir:
+Hay que incluir una nueva operación remota que tenga como parámetros el nombre de fichero precedido por su longitud y reciba como respuesta el contenido del fichero precedido por su tamaño.
+En ring_download, hay que usar mmap y recv para recoger el fichero. El ejemplo copy_read_mmap.c muestra el uso de esta técnica pero en el contexto de la copia de un fichero. Puede incorporarlo a la práctica sustituyendo la lectura del fichero origen por la recepción del socket.
+En la operación dentro del servidor, hay que usar sendfile para enviar el fichero por el socket. El ejemplo copy_sendfile.c muestra el uso de esta técnica pero en el contexto de la copia de un fichero. Puede incorporarlo a la práctica sustituyendo la escritura en el fichero destino por el envío por el socket.
+Prueba
+A continuación, se muestra una prueba para comprobar la funcionalidad de este paso, planteando un escenario similar al mostrado en la parte inicial del documento. Dado que se produce una descarga directa sin usar el anillo, solo haría falta arrancar dos nodos, pero mantenemos el mismo escenario con 4 nodos planteado en el ejemplo inicial.
+En el primer equipo, se crea la red.
+
+ssoo@triqui1:src$ mkdir dir1
+ssoo@triqui1:src$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 33877 (PID 3353312) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+En el segundo equipo, se añade un nodo a la red:
+
+ssoo@triqui2:src$ mkdir dir2
+ssoo@triqui2:src$ ./ring dir2 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui2.fi.upm.es con IP 138.100.240.43 y puerto 37345 (PID 1599259) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+
+Añadimos un tercer nodo usando el primero como nodo de contacto.
+ssoo@triqui3:src$ mkdir dir3
+ssoo@triqui3:src$ ./ring dir3 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui3.fi.upm.es con IP 138.100.240.41 y puerto 42777 (PID 2540925) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+        
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Por último, añadimos un cuarto nodo usando el segundo nodo creado como nodo de contacto.
+ssoo@triqui4:src$ mkdir dir4
+ssoo@triqui4:src$ echo hola > dir4/f.txt
+ssoo@triqui4:src$ ./ring dir4 triqui2.fi.upm.es 37345
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui4.fi.upm.es con IP 138.100.240.47 y puerto 41785 (PID 2491371) se incorpora a la red a través del equipo 138.100.240.43 puerto 37345
+Volvemos al primer equipo para descargar directamente del cuarto nodo un fichero que existe y otro que no:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+D
+Introduzca el nombre o la IP del host remoto: triqui4.fi.upm.es
+Introduzca el puerto del host remoto: 41785
+Introduzca el nombre del fichero: f.txt
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+D
+Introduzca el nombre o la IP del host remoto: triqui4.fi.upm.es
+Introduzca el puerto del host remoto: 41785
+Introduzca el nombre del fichero: noexiste.txt
+
+error en ring_download
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+
+ssoo@triqui1:src$ cat dir1/f.txt # el fichero ha sido descargado
+hola
+Fase 4: Búsqueda de un fichero (2,5 puntos)
+Es la fase más representativa de la idiosincrasia de la práctica: el uso de una red P2P para localizar recursos. Se trata de una búsqueda lineal que va recorriendo el anillo a partir del nodo donde un usuario realiza la petición hasta que o bien se encuentra el fichero, obteniendo la dirección IP y el puerto del nodo que lo contiene, o bien se alcanza el número máximo de nodos visitados (número de saltos), que es un parámetro de la operación, devolviendo un error. Para entender este parámetro, tenga en cuenta que un valor de 0 saltos indica que la búsqueda se restringiría al nodo local, mientras que un valor de 1 significa que solo se busca en el nodo local y en su sucesor, y así sucesivamente.
+En cuanto al modo de operación de esta búsqueda, se podría considerar que es una especie de función recursiva extendida a la red P2P, que podría representarse con este esquema:
+
+búsqueda de fichero F con S saltos en un nodo N
+    Si F está almacenado en N -> resultado=N
+    Si S == 0 -> resultado=error
+    Si no -> resultado=búsqueda de F con S-1 saltos en sucesor de N
+Nótese que la respuesta, sea la IP y el puerto del nodo encontrado o un error por llegar al máximo número de saltos, viaja de vuelta por todos los nodos implicados, lo que permitiría implementar una especie de caché de localizaciones de fichero.
+Tenga en cuenta que esta especie de recursividad posibilita el uso de la función ring_lookup desde la parte servidora.
+
+Recuerde que se deben respetar las consideraciones sobre el manejo de nombres de fichero (envío previo de la longitud del nombre y evitar la fragmentación de los paquetes de red).
+
+Prueba
+A continuación, se muestra una prueba para comprobar la funcionalidad de este paso, planteando un escenario similar al mostrado en la parte inicial del documento.
+En el primer equipo, se crea la red.
+
+ssoo@triqui1:src$ mkdir dir1
+ssoo@triqui1:src$ ./ring dir1
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui1.fi.upm.es con IP 138.100.240.42 y puerto 33877 (PID 3353312) es el primer nodo de una nueva red
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+En el segundo equipo, se añade un nodo a la red:
+
+ssoo@triqui2:src$ mkdir dir2
+ssoo@triqui2:src$ ./ring dir2 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui2.fi.upm.es con IP 138.100.240.43 y puerto 37345 (PID 1599259) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+
+Añadimos un tercer nodo usando el primero como nodo de contacto.
+ssoo@triqui3:src$ mkdir dir3
+ssoo@triqui3:src$ ./ring dir3 triqui1.fi.upm.es 33877
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui3.fi.upm.es con IP 138.100.240.41 y puerto 42777 (PID 2540925) se incorpora a la red a través del equipo 138.100.240.42 puerto 33877
+        
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+Por último, añadimos un cuarto nodo usando el segundo nodo creado como nodo de contacto.
+ssoo@triqui4:src$ mkdir dir4
+ssoo@triqui4:src$ echo hola > dir4/f.txt
+ssoo@triqui4:src$ ./ring dir4 triqui2.fi.upm.es 37345
+Bienvenido a la red P2P RING
+----------------------------
+El equipo triqui4.fi.upm.es con IP 138.100.240.47 y puerto 41785 (PID 2491371) se incorpora a la red a través del equipo 138.100.240.43 puerto 37345
+Volvemos al primer equipo para realizar tres búsquedas: un fichero que no existe, uno que sí existe pero que no se localiza porque el número de saltos especificados no es suficiente y un último que sí puede ser localizado:
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+L
+Introduzca el nombre del fichero: noexiste.txt
+Introduzca el número máximo de nodos visitados: 4
+error en ring_lookup
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+L
+Introduzca el nombre del fichero: f.txt
+Introduzca el número máximo de nodos visitados: 2
+error en ring_lookup
+
+Seleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)
+        I: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)
+L
+Introduzca el nombre del fichero: f.txt
+Introduzca el número máximo de nodos visitados: 4
+
+IP 138.100.240.47 port 41785
+Fase 5: Búsqueda y descarga de un fichero (0 puntos)
+Corresponde a la operación de cliente ring_get_file, que ya está programada en el material de apoyo puesto que se basa en el uso combinado de las dos operaciones previas: una invocación de la función ring_lookup, para localizar el nodo que contiene el fichero, seguida de una invocación de la función ring_download, para descargar directamente el fichero desde el nodo encontrado, siempre que la búsqueda haya sido fructífera y el nodo encontrado no sea el local. El primer ejemplo de ejecución mostrado en este documento corresponde precisamente a la prueba de esta fase final.
+Entrega de la práctica
+Se realizará en la máquina triqui, usando el mandato:
+entrega.sd ring.2026
+Este mandato recogerá los siguientes ficheros:
+
+ring_cln.c
+ring_srv.c
+common.c
+include/common.h
