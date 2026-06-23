@@ -1,0 +1,47 @@
+Aplicación P2P para compartir contenidos (RING): parte extra
+En este documento se plantea una extensión de la práctica que permite obtener una nota adicional de 4 puntos, que solo podrá ser obtenida si la parte obligatoria pasa todas las pruebas.
+Nótese que esta parte extra tiene un mayor nivel de exigencia no mostrándose ejemplos de uso de los servicios del sistema requeridos ni especificándose pruebas concretas para verificar la funcionalidad.
+
+Entrega y material de apoyo
+Esta parte extra se entrega con el mismo mandato que la obligatoria por lo que se debe trabajar en el mismo directorio. Por tanto, antes de empezar con esta parte, debe guardar una copia de la parte obligatoria.
+Como material de apoyo inicial, se proporciona:
+
+src/main.c: nueva versión de la interfaz de usuario que permite probar las nuevas operaciones introducidas en esta parte extra.
+src/include/ring.h: API del cliente incluyendo las nuevas funciones.
+src/ring_cln_extra.c: incluye solo las nuevas funciones, entre ellas, las dos que hay que implementar, que inicialmente están vacías. La idea es mezclar este fichero con src/ring_cln.c de la versión obligatoria.
+src/get_slices.c: ejemplo de uso de la función con el mismo nombre.
+Objetivo de la parte extra de la práctica
+Como se ha estudiado en la parte teórica, algunas aplicaciones P2P de compartición de contenidos, para agilizar su modo de operación, permiten descargar un fichero en paralelo de varios nodos recibiendo una rodaja del fichero por cada nodo.
+Aunque se llevó a cabo de manera incremental, el objetivo final de la parte obligatoria era implementar una operación que busca y descarga un fichero del primer nodo encontrado en el anillo que lo contiene, siempre que no exista previamente una copia local, limitando la búsqueda a un número máximo de nodos:
+
+int ring_get_file(const char *filename, int hops);
+El objetivo final de esta parte extra es el mismo, pero realizando la descarga en paralelo de todos los nodos encontrados en la búsqueda, asegurando un tamaño mínimo de rodaja dado que no tendría sentido desde el punto de vista de la eficiencia descargar unos pocos bytes de cada nodo.
+int ring_pget_file(const char *filename, int hops, int slice_size);
+Como sucedía en la parte obligatoria, este desarrollo se realiza de forma incremental. De hecho, esa función ya está implementada en el material de apoyo de esta parte extra basándose en el uso combinado de dos nuevas funciones que hay que implementar:
+int ring_pdownload(int num_nodes, int slice_size, const unsigned int *remote_ips, const unsigned short *remote_ports, const char *filename);
+
+int ring_mlookup(const char *filename, int hops, unsigned int *ips, unsigned short *ports);
+Por tanto, hay dos partes que se pueden afrontar de forma totalmente independiente.
+Descarga en paralelo usando epoll (2 puntos)
+La función que hay que implementar recibe como argumentos las direcciones IP y puertos de un conjunto de nodos de tamaño num_nodes que contienen copias del fichero filename descargando en paralelo el fichero de esos nodos teniendo en cuenta el parámetro slice_size:
+// descarga el fichero en paralelo de los nodos especificados;
+// retorna el tamaño del fichero si OK y -1 en caso de error
+int ring_pdownload(int num_nodes, int slice_size, const unsigned int *remote_ips, const unsigned short *remote_ports, const char *filename);
+Nótese que se asume que la copia del fichero es idéntica en todos los nodos (en un sistema real se podrían usar hashes para verificarlo).
+Para obtener paralelismo en la descarga (es decir, ir actualizándose en paralelo las distintas partes del fichero según van llegando los datos de los distintos nodos), en vez de usar flujos de ejecución concurrentes (no se permiten usar threads ni procesos en el cliente para esta operación de descarga en paralelo), se va a usar un modelo basado en eventos utilizando el servicio epoll de Linux (por ejemplo, Nginx y NodeJS lo usan). Nótese que debe mantenerse el uso de mmap en la parte cliente y de sendfile en la parte servidora.
+
+El modo de operación de esta función es el siguiente:
+
+Debe obtener de cualquier nodo el tamaño del fichero.
+Debe usar la función get_slices para determinar qué nodos (lista de IPs y puertos) estarán involucrados en la descarga y qué rodaja (offset y tamaño) le corresponde a cada uno. Nótese que, para evitar la ineficiencia por descargas demasiado pequeñas, el parámetro slice_size define un tamaño de rodaja mínimo que asegura que a ningún nodo le corresponde un tamaño menor que ese (excepto si el tamaño del fichero es menor que esa rodaja mínima), lo que puede conllevar que no todos los nodos estén involucrados. En cualquier caso, no es necesario que entienda el funcionamiento de dicha función: basta con usar esos tres valores devueltos (nodos involucrados y qué offset y tamaño le corresponde a cada uno).
+Enviará a cada nodo involucrado el nombre del fichero y la rodaja.
+En este punto es donde entra el servicio epoll. El cliente se queda esperando por la llegada de mensajes de los servidores involucrados y va actualizando las partes correspondientes del fichero según le van llegando sus datos asociados. Nótese que, en este escenario, no se puede usar la opción MSG_WAITALL porque arruinaría el paralelismo.
+Operación lookup múltiple (2 puntos)
+La función que hay que implementar recibe los mismos argumentos de entrada que la función lookup original (fichero y máximo número de saltos), pero, en vez de retornar solo el primer nodo que contiene el fichero, devuelve las direcciones IP y puertos de todos los nodos que lo contienen, incluyendo el propio nodo local, y retorna en cuántos nodos lo ha encontrado dentro de los nodos visitados dado el número de saltos (0 si no lo encuentra en ninguno).
+// busca el fichero en el anillo, incluido localmente, dando un número
+// máximo de saltos y devolviendo las IPs y los puertos de los nodos que
+// lo contienen; retorna el número de nodos que lo contienen si OK y -1 si error
+// NOTA: Dado que se comprueba la existencia del fichero en hops + 1
+// nodos, el llamador debe especificar en los dos últimos parámetros
+// dos vectores con tamaño igual hops + 1
+int ring_mlookup(const char *filename, int hops, unsigned int *ips, unsigned short *ports);

@@ -24,8 +24,6 @@
 #define OP_GET_SUC_SUC 4 
 #define OP_DOWNLOAD 5
 #define OP_LOOKUP 6
-#define OP_MLOOKUP 7
-#define OP_DOWNLOAD_SLICE 8
 // thread de servicio
 void *server_thread(void *arg);
 

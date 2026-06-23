@@ -87,3 +87,30 @@ entrega.sd ring.2026
 ```
 
 En el servidor `triqui1.fi.upm.es` (usuario `jiaxu.he`).
+
+---
+
+## Parte extra (+4 pts)
+
+### Nuevas operaciones del protocolo
+
+| Código | Operación | Descripción |
+|--------|-----------|-------------|
+| `OP_MLOOKUP` (7) | Multi-lookup | Busca el fichero en todos los nodos del anillo |
+| `OP_DOWNLOAD_SLICE` (8) | Descarga rodaja | Descarga un fragmento del fichero (offset + tamaño) |
+
+### Funciones a implementar
+
+**`ring_mlookup` (2 pts)** — Busca el fichero en todos los nodos visitados (hasta `hops+1`) y devuelve arrays con las IPs y puertos de todos los que lo tienen.
+
+- [ ] Cliente (`ring_cln.c`): comprueba local, si `hops > 0` envía `OP_MLOOKUP` al sucesor, combina resultados
+- [ ] Servidor (`ring_srv.c`): handler `OP_MLOOKUP` — llama a `ring_mlookup` recursivamente y devuelve lista de nodos
+
+**`ring_pdownload` (2 pts)** — Descarga el fichero en paralelo de varios nodos usando `epoll` (sin threads).
+
+- [ ] Servidor (`ring_srv.c`): handler `OP_DOWNLOAD_SLICE` — recibe filename + offset + size, responde con `sendfile` desde el offset
+- [ ] Cliente (`ring_cln.c`): obtiene tamaño del fichero, calcula rodajas con `get_slices`, abre sockets a cada nodo, registra en `epoll`, recibe datos en paralelo sobre `mmap`
+
+### Ya implementado (no tocar)
+- `get_slices()` — calcula qué rodaja le toca a cada nodo
+- `ring_pget_file()` — orquesta `ring_mlookup` + `ring_pdownload`

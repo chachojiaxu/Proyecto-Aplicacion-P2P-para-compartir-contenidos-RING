@@ -38,23 +38,4 @@ int ring_lookup(const char *filename, int hops, unsigned int *ip, unsigned short
 // retorna el tamaño del fichero si OK y -1 en caso de error
 int ring_get_file(const char *filename, int hops);
 
-// PARTE EXTRA
-// descarga el fichero en paralelo de los nodos especificados;
-// retorna el tamaño del fichero si OK y -1 en caso de error
-int ring_pdownload(int num_nodes, int slice_size, const unsigned int *remote_ips, const unsigned short *remote_ports, const char *filename);
-
-// busca el fichero en el anillo, incluido localmente, dando un número
-// máximo de saltos y devolviendo las IPs y los puertos de los nodos que
-// lo contienen; retorna el número de nodos que lo contienen si OK y -1 si error
-// NOTA: Dado que se comprueba la existencia del fichero en hops + 1
-// nodos, el llamador debe especificar en los dos últimos parámetros
-// dos vectores con tamaño igual hops + 1
-
-int ring_mlookup(const char *filename, int hops, unsigned int *ips, unsigned short *ports);
-
-// busca y descarga en paralelo el fichero de los nodos encontrados en el
-// anillo que lo contienen siempre que no esté almacenado localmente;
-// retorna el tamaño transferido si el fichero existe y -1 en caso de error
-int ring_pget_file(const char *filename, int hops, int slice_size);
-
 #endif // _RING_H

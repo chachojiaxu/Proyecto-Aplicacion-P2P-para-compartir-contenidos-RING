@@ -91,7 +91,7 @@ static void user_commands(void) {
     char *fichero;
     int hops;
     while (1) {
-        op=leer_string("\nSeleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)\n\tI: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)|A:pArallel Download|M:Mlookup|G: gEt paralelo del fichero (mlookup+pdownload)\n");
+        op=leer_string("\nSeleccione operación (línea vacía para terminar; en menús internos para volver a menú principal)\n\tI: obtiene Info de nodo local| P: getPid|S: Sucesor|R:sucesor Remoto|U: sUcesor de sucesor remoto|D: Download|L: Lookup fichero|G: Get fichero (lookup+download)\n");
         if (op==NULL) break;
         switch(op[0]) {
             case 'I':
@@ -174,58 +174,6 @@ static void user_commands(void) {
                 if (hops==-1) continue;
                 if (ring_get_file(fichero, hops)<0)
                     printf("error en ring_get_file\n");
-                break;
-            case 'A': {
-                int n =leer_int("Introduzca el número de host remotos: ");
-                if (n==-1) continue;
-		unsigned int ips[n];
-		unsigned short ports[n];
-		int i;
-                for (i=0; i<n; i++) {
-                    host=leer_string("Introduzca el nombre o la IP del host remoto: ");
-                    if (host==NULL) break;
-                    if (getIP(host, &ips[i]) < 0) break;
-                    port=leer_int("Introduzca el puerto del host remoto: ");
-                    if (port==-1) break;
-		    ports[i]=htons(port);
-		}
-		if (i<n) continue;
-                fichero=leer_string("Introduzca el nombre del fichero: ");
-                if (fichero==NULL) continue;
-                int slice_size = leer_int("Introduzca el tamaño de la rodaja: ");
-		if (slice_size==-1) continue;
-                if (ring_pdownload(n, slice_size, ips, ports, fichero)<0)
-                    printf("error en ring_pdownload\n");
-                break; }
-            case 'M': {
-                fichero=leer_string("Introduzca el nombre del fichero: ");
-                if (fichero==NULL) continue;
-                hops=leer_int("Introduzca el número máximo de nodos visitados: ");
-                if (hops==-1) continue;
-		unsigned int ips[hops+1];
-		unsigned short ports[hops+1];
-		int res;
-                if ((res=ring_mlookup(fichero, hops, ips, ports))<0)
-                    printf("error en ring_mlookup\n");
-                else {
-                    printf("\nse ha encontrado en %d nodos\n", res);
-		    for (int i=0; i<res; i++)
-                        printf("\nIP %s port %d\n", getIPdot(ips[i]), ntohs(ports[i]));
-                }
-                break;
-		}
-            case 'E':
-                fichero=leer_string("Introduzca el nombre del fichero: ");
-                if (fichero==NULL) continue;
-                hops=leer_int("Introduzca el número máximo de nodos visitados: ");
-                if (hops==-1) continue;
-                int slice_size = leer_int("Introduzca el tamaño de la rodaja: ");
-		if (slice_size==-1) continue;
-		int res;
-                if ((res=ring_pget_file(fichero, hops, slice_size))<0)
-                    printf("error en ring_pget_file\n");
-		else
-                    printf("ring_pget_file ha devuelto %d bytes\n", res);
                 break;
             default:
                 printf("operación no válida\n");
